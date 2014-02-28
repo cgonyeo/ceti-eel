@@ -1,12 +1,14 @@
-package ceti-eel
+package main
 
 import (
+    "os"
     "fmt"
     "strings"
     "github.com/thoj/go-ircevent"
 )
 
-var roomName = "#botsex"
+var server string
+var channel = "#botsex"
 var myNick = "gonbot"
 var con *irc.Connection
 var goTime = false
@@ -14,9 +16,22 @@ var admin = false
 var op = false
 
 func main() {
+    args := os.Args
+    if len(args) == 2 && args[1] == "-h" {
+        fmt.Println("Usage: ceti-eel <server.com:port> <#channel> <nick>")
+        os.Exit(0)
+    }
+    if len(args) != 4 {
+        fmt.Println("Usage: ceti-eel <server.com:port> <#channel> <nick>")
+        os.Exit(1)
+    }
+    server = args[1]
+    channel = args[2]
+    myNick = args[3]
+
     //Make a connection, "nick", "user"
-    con = irc.IRC("gonbot", "gonbot")
-    err := con.Connect("skynet.csh.rit.edu:6667")
+    con = irc.IRC(myNick, myNick)
+    err := con.Connect(server)
     if err != nil {
         fmt.Println("Failed connecting")
         return
@@ -31,24 +46,25 @@ func main() {
 
 //Send a message to the server requesting the list of everyone in the channel
 func checkNames() {
-    con.SendRaw("NAMES " + roomName)
+    con.SendRaw("NAMES " + channel)
 }
 
+//Connection to the server is successful, so let's join the channel
 func connectionMade(e *irc.Event) {
-    con.Join(roomName)
+    con.Join(channel)
 }
 
 //Parrot back a message if it begins with <name>: 
 func newPrivmsg(e *irc.Event) {
     msg := e.Message()
     if len(msg) > len(myNick) && msg[0:len(myNick)] == myNick {
-        con.Privmsg(roomName, msg[len(myNick)+2:])
+        con.Privmsg(channel, msg[len(myNick)+2:])
     }
 }
 
 func modeChanged(e *irc.Event) {
-    //Check if we got op
-    if len(e.Arguments) >= 3 && e.Arguments[0] == roomName {
+    //Check if our op/admin priveleges changed
+    if len(e.Arguments) >= 3 && e.Arguments[0] == channel {
         adding := true
         gotOp := false
         gotAdmin := false
@@ -124,10 +140,10 @@ func takeControl(names []string) {
     for _, name := range names {
         if name[1:] != myNick  && name[1:] != "dgonyeo" {
             if name[0] == '!' {
-                con.SendRaw("MODE " + roomName + " -ao " + name[1:])
+                con.SendRaw("MODE " + channel + " -ao " + name[1:])
             }
             if name[0] == '@' {
-                con.SendRaw("MODE " + roomName + " -o " + name[1:])
+                con.SendRaw("MODE " + channel + " -o " + name[1:])
             }
         }
     }
