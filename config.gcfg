@@ -1,0 +1,8 @@
+;Configuration file for Ceti Eel
+
+[Connection]
+Server=skynet.csh.rit.edu
+Port=6667
+;Omit the '#' from the channel name
+Channel=botcunnilingus
+Nick=gonbot

@@ -4,6 +4,8 @@ import (
     "os"
     "fmt"
     "strings"
+    "bufio"
+    "code.google.com/p/gcfg"
     "github.com/thoj/go-ircevent"
 )
 
@@ -14,26 +16,61 @@ var con *irc.Connection
 var goTime = false
 var admin = false
 var op = false
+var config = struct {
+    Connection struct {
+        Server string
+        Port string
+        Channel string
+        Nick string
+    }
+}{}
 
 func main() {
     args := os.Args
-    if len(args) == 2 && args[1] == "-h" {
-        fmt.Println("Usage: ceti-eel <server.com:port> <#channel> <nick>")
-        os.Exit(0)
-    }
-    if len(args) != 4 {
-        fmt.Println("Usage: ceti-eel <server.com:port> <#channel> <nick>")
+    if len(args) != 2 {
+        fmt.Println("Usage: ceti-eel <config-file.gcfg>")
         os.Exit(1)
     }
-    server = args[1]
-    channel = args[2]
-    myNick = args[3]
+    if args[1] == "-h" {
+        fmt.Println("Usage: ceti-eel <config-file.gcfg>")
+        os.Exit(0)
+    }
 
+    file, fiError := os.Open(args[1])
+    if fiError != nil {
+        fmt.Println("Error opening config file")
+        os.Exit(1)
+    }
+    defer file.Close()
+
+    var lines string
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        lines += scanner.Text() + "\n"
+    }
+    if scanner.Err() != nil {
+        fmt.Println("Scanner error")
+        os.Exit(1)
+    }
+
+    err := gcfg.ReadStringInto(&config, lines)
+    if err != nil {
+        fmt.Println("Error parsing config")
+        os.Exit(1)
+    }
+
+    server = config.Connection.Server + ":" + config.Connection.Port
+    channel = "#" + config.Connection.Channel
+    myNick = config.Connection.Nick
+
+    fmt.Println("Connecting to " + server)
+    fmt.Println("And joining " + channel)
+    fmt.Println("As " + myNick)
 
     //Make a connection, "nick", "user"
     con = irc.IRC(myNick, myNick)
-    err := con.Connect(server)
-    if err != nil {
+    conErr := con.Connect(server)
+    if conErr != nil {
         fmt.Println("Failed connecting")
         return
     }
