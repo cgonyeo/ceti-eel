@@ -29,6 +29,7 @@ func main() {
     channel = args[2]
     myNick = args[3]
 
+
     //Make a connection, "nick", "user"
     con = irc.IRC(myNick, myNick)
     err := con.Connect(server)
@@ -47,6 +48,10 @@ func main() {
 //Send a message to the server requesting the list of everyone in the channel
 func checkNames() {
     con.SendRaw("NAMES " + channel)
+}
+
+func changeUsersMode(nick string, mode string) {
+    con.SendRaw("MODE " + channel + " " + mode + " " + nick)
 }
 
 //Connection to the server is successful, so let's join the channel
@@ -94,10 +99,14 @@ func modeChanged(e *irc.Event) {
         if gotOp && wereInTheList {
             //We got op, let's take note of this
             op = adding
+            fmt.Print("op:")
+            fmt.Println(adding)
         }
         if gotAdmin && wereInTheList {
             //We got admin, let's take note of this
             admin = adding
+            fmt.Print("admin:")
+            fmt.Println(adding)
         }
         checkNames()
     }
@@ -105,10 +114,12 @@ func modeChanged(e *irc.Event) {
 
 func gotNames(e *irc.Event) {
     names := strings.Fields(e.Message())
+    banish := true
     //If we're admin and it's not go time, then let's make it go time
-    if admin && !goTime {
-        fmt.Println("Go time!")
-        goTime = true
+    if admin {
+        if !goTime {
+            goTime, banish = true, false
+        }
     } else if op {
         //Else if we're op and there's not an admin, and it's not go time, 
         //then let's make it go time
@@ -118,12 +129,12 @@ func gotNames(e *irc.Event) {
                 theresAnAdmin = true
             }
         }
+
         if !theresAnAdmin && !goTime {
-            fmt.Println("Go time!")
-            goTime = true
-        } else if goTime {
+            goTime, banish = true, false
+        } else if theresAnAdmin && goTime {
             //If there's an admin and we have op and it's go time, 
-            //it's not actually go time
+            //it's not actually go time :(
             goTime = false
         }
     } else {
@@ -131,19 +142,28 @@ func gotNames(e *irc.Event) {
         goTime = false
     }
     if goTime {
-        takeControl(names)
+        takeControl(names, banish)
     }
 }
 
 //De-op and de-admin everyone
-func takeControl(names []string) {
+func takeControl(names []string, banish bool) {
     for _, name := range names {
         if name[1:] != myNick  && name[1:] != "dgonyeo" {
             if name[0] == '!' {
-                con.SendRaw("MODE " + channel + " -ao " + name[1:])
+                changeUsersMode(name[1:], "-a")
+                changeUsersMode(name[1:], "-o")
+                if banish {
+                    changeUsersMode(name[1:], "+b")
+                    con.SendRaw("KICK " + channel + " " + name[1:])
+                }
             }
             if name[0] == '@' {
-                con.SendRaw("MODE " + channel + " -o " + name[1:])
+                changeUsersMode(name[1:], "-o")
+                if banish {
+                    changeUsersMode(name[1:], "+b")
+                    con.SendRaw("KICK " + channel + " " + name[1:])
+                }
             }
         }
     }
